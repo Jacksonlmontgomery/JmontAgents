@@ -3,173 +3,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JmontAgents - Agent Build Dashboard</title>
+    <title>JmontAgents - AI Agent Impact Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="app">
-        <header class="header">
-            <div class="header-left">
-                <h1 class="logo">JmontAgents</h1>
-                <span class="subtitle">Agent Build Dashboard</span>
-            </div>
-            <div class="header-right">
-                <span class="last-updated" id="lastUpdated"></span>
-                <button class="btn btn-primary" id="addAgentBtn">+ New Agent</button>
-            </div>
-        </header>
 
-        <!-- Summary Cards -->
-        <section class="summary-cards" id="summaryCards"></section>
+    <!-- Top Nav -->
+    <nav class="top-nav">
+        <div class="nav-inner">
+            <div class="nav-left">
+                <span class="nav-logo">Jmont</span><span class="nav-logo-accent">Agents</span>
+                <span class="nav-badge">AI Impact Dashboard</span>
+            </div>
+            <div class="nav-right">
+                <button class="btn btn-ghost" id="exportBtn" title="Export JSON">Export</button>
+                <button class="btn btn-accent" id="addAgentBtn">+ New Agent</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+
+        <!-- Exec KPI Strip -->
+        <section class="kpi-strip" id="kpiStrip"></section>
 
         <!-- Filters -->
-        <section class="filters">
-            <div class="filter-group">
-                <label for="filterDepartment">Department</label>
+        <section class="filter-bar">
+            <div class="filter-item">
                 <select id="filterDepartment">
                     <option value="all">All Departments</option>
                 </select>
             </div>
-            <div class="filter-group">
-                <label for="filterStatus">Status</label>
+            <div class="filter-item">
                 <select id="filterStatus">
                     <option value="all">All Statuses</option>
                     <option value="planning">Planning</option>
-                    <option value="in-progress">In Progress</option>
+                    <option value="active">Active</option>
                     <option value="testing">Testing</option>
                     <option value="deployed">Deployed</option>
                     <option value="paused">Paused</option>
                 </select>
             </div>
-            <div class="filter-group">
-                <label for="searchInput">Search</label>
-                <input type="text" id="searchInput" placeholder="Search agents...">
+            <div class="filter-item filter-search">
+                <input type="text" id="searchInput" placeholder="Search agents, owners, departments...">
             </div>
         </section>
 
-        <!-- Department Breakdown -->
-        <section class="department-section">
-            <h2 class="section-title">Department Breakdown</h2>
-            <div class="department-grid" id="departmentGrid"></div>
-        </section>
+        <!-- Department Accordion List -->
+        <section class="dept-list" id="deptList"></section>
 
-        <!-- Agent Table -->
-        <section class="table-section">
-            <h2 class="section-title">All Agents</h2>
-            <div class="table-wrapper">
-                <table class="agent-table">
-                    <thead>
-                        <tr>
-                            <th>Agent Name</th>
-                            <th>Department</th>
-                            <th>Status</th>
-                            <th>Progress</th>
-                            <th>Owner</th>
-                            <th>Start Date</th>
-                            <th>Target Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="agentTableBody"></tbody>
-                </table>
-            </div>
-        </section>
-    </div>
+    </main>
 
     <!-- Add/Edit Agent Modal -->
-    <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-bg" id="modalBg">
         <div class="modal">
-            <div class="modal-header">
-                <h2 id="modalTitle">Add New Agent</h2>
-                <button class="modal-close" id="modalClose">&times;</button>
+            <div class="modal-head">
+                <h2 id="modalTitle">New Agent</h2>
+                <button class="modal-x" id="modalClose">&times;</button>
             </div>
-            <form id="agentForm" class="modal-body">
+
+            <!-- Modal Tabs -->
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-tab="details">Details</button>
+                <button class="modal-tab" data-tab="usage">Usage & Impact</button>
+            </div>
+
+            <form id="agentForm" class="modal-body" autocomplete="off">
                 <input type="hidden" id="agentId">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="agentName">Agent Name *</label>
-                        <input type="text" id="agentName" required placeholder="e.g. Customer Support Bot">
+
+                <!-- Tab: Details -->
+                <div class="tab-panel active" data-panel="details">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="agentName">Agent Name *</label>
+                            <input type="text" id="agentName" required placeholder="e.g. Customer Support Bot">
+                        </div>
+                        <div class="form-group">
+                            <label for="agentDepartment">Department *</label>
+                            <select id="agentDepartment" required>
+                                <option value="">Select...</option>
+                                <option value="Engineering">Engineering</option>
+                                <option value="Sales">Sales</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Customer Support">Customer Support</option>
+                                <option value="HR">HR</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Operations">Operations</option>
+                                <option value="Legal">Legal</option>
+                                <option value="Product">Product</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="agentStatus">Status *</label>
+                            <select id="agentStatus" required>
+                                <option value="planning">Planning</option>
+                                <option value="active">Active</option>
+                                <option value="testing">Testing</option>
+                                <option value="deployed">Deployed</option>
+                                <option value="paused">Paused</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="agentOwner">Owner</label>
+                            <input type="text" id="agentOwner" placeholder="e.g. Jane Smith">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="agentStartDate">Start Date</label>
+                            <input type="date" id="agentStartDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="agentTargetDate">Target Date</label>
+                            <input type="date" id="agentTargetDate">
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label for="agentDepartment">Department *</label>
-                        <select id="agentDepartment" required>
-                            <option value="">Select department...</option>
-                            <option value="Engineering">Engineering</option>
-                            <option value="Sales">Sales</option>
-                            <option value="Marketing">Marketing</option>
-                            <option value="Customer Support">Customer Support</option>
-                            <option value="HR">HR</option>
-                            <option value="Finance">Finance</option>
-                            <option value="Operations">Operations</option>
-                            <option value="Legal">Legal</option>
-                            <option value="Product">Product</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="agentStatus">Status *</label>
-                        <select id="agentStatus" required>
-                            <option value="planning">Planning</option>
-                            <option value="in-progress">In Progress</option>
-                            <option value="testing">Testing</option>
-                            <option value="deployed">Deployed</option>
-                            <option value="paused">Paused</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="agentProgress">Progress (%)</label>
-                        <input type="number" id="agentProgress" min="0" max="100" value="0">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="agentOwner">Owner</label>
-                        <input type="text" id="agentOwner" placeholder="e.g. Jane Smith">
-                    </div>
-                    <div class="form-group">
-                        <label for="agentPriority">Priority</label>
-                        <select id="agentPriority">
-                            <option value="low">Low</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="high">High</option>
-                            <option value="critical">Critical</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="agentStartDate">Start Date</label>
-                        <input type="date" id="agentStartDate">
-                    </div>
-                    <div class="form-group">
-                        <label for="agentTargetDate">Target Date</label>
-                        <input type="date" id="agentTargetDate">
+                        <label for="agentDescription">Description</label>
+                        <textarea id="agentDescription" rows="2" placeholder="What does this agent do?"></textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="agentDescription">Description</label>
-                    <textarea id="agentDescription" rows="3" placeholder="Brief description of the agent's purpose..."></textarea>
+
+                <!-- Tab: Usage & Impact -->
+                <div class="tab-panel" data-panel="usage">
+                    <p class="tab-hint">Track real usage and tie it to dollars. If it's not used, it's not real.</p>
+
+                    <div class="form-section-label">Usage Tracking</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="agentUsesPerWeek">Uses / Week</label>
+                            <input type="number" id="agentUsesPerWeek" min="0" value="0" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="agentActiveUsers">Active Users</label>
+                            <input type="text" id="agentActiveUsers" placeholder="e.g. Kylie, Jackson, Sales">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="agentLastUsed">Last Used Date</label>
+                            <input type="date" id="agentLastUsed">
+                        </div>
+                        <div class="form-group">
+                            <label for="agentHoursSaved">Est. Hours Saved / Week</label>
+                            <input type="number" id="agentHoursSaved" min="0" step="0.5" value="0" placeholder="0">
+                        </div>
+                    </div>
+
+                    <div class="form-section-label">Financial Impact</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="agentBlendedRate">Blended Hourly Rate ($)</label>
+                            <input type="number" id="agentBlendedRate" min="0" value="100" placeholder="100">
+                        </div>
+                        <div class="form-group">
+                            <label>$ Value Saved / Year</label>
+                            <div class="computed-value" id="computedSavings">$0</div>
+                        </div>
+                    </div>
+
+                    <div class="form-section-label">Revenue Influence</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="agentRevenueInfluence">Revenue Tie</label>
+                            <select id="agentRevenueInfluence">
+                                <option value="none">None</option>
+                                <option value="indirect">Indirect (faster output, better quality)</option>
+                                <option value="direct">Direct (closed deals, pipeline)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="agentRevenueNote">Revenue Note</label>
+                            <input type="text" id="agentRevenueNote" placeholder="e.g. Used in 12 proposals">
+                        </div>
+                    </div>
+
+                    <div class="form-section-label">Replacement Value</div>
+                    <div class="form-group">
+                        <label for="agentReplaces">What does this replace?</label>
+                        <input type="text" id="agentReplaces" placeholder="e.g. Replaces manual proposal writing, avoids hiring 1 junior">
+                    </div>
                 </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="saveBtn">Save Agent</button>
+
+                <div class="modal-foot">
+                    <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn btn-accent" id="saveBtn">Save Agent</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div class="modal-overlay" id="deleteModalOverlay">
+    <div class="modal-bg" id="deleteBg">
         <div class="modal modal-sm">
-            <div class="modal-header">
-                <h2>Confirm Delete</h2>
-                <button class="modal-close" id="deleteModalClose">&times;</button>
+            <div class="modal-head">
+                <h2>Delete Agent</h2>
+                <button class="modal-x" id="deleteClose">&times;</button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete <strong id="deleteAgentName"></strong>?</p>
-                <div class="modal-actions">
-                    <button class="btn btn-secondary" id="deleteCancelBtn">Cancel</button>
+                <p>Are you sure you want to delete <strong id="deleteAgentName"></strong>? This cannot be undone.</p>
+                <div class="modal-foot">
+                    <button class="btn btn-ghost" id="deleteCancelBtn">Cancel</button>
                     <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
                 </div>
             </div>
