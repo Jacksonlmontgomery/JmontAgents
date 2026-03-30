@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JmontAgents - Agent Build Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="header-left">
+                <h1 class="logo">JmontAgents</h1>
+                <span class="subtitle">Agent Build Dashboard</span>
+            </div>
+            <div class="header-right">
+                <span class="last-updated" id="lastUpdated"></span>
+                <button class="btn btn-primary" id="addAgentBtn">+ New Agent</button>
+            </div>
+        </header>
+
+        <!-- Summary Cards -->
+        <section class="summary-cards" id="summaryCards"></section>
+
+        <!-- Filters -->
+        <section class="filters">
+            <div class="filter-group">
+                <label for="filterDepartment">Department</label>
+                <select id="filterDepartment">
+                    <option value="all">All Departments</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filterStatus">Status</label>
+                <select id="filterStatus">
+                    <option value="all">All Statuses</option>
+                    <option value="planning">Planning</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="testing">Testing</option>
+                    <option value="deployed">Deployed</option>
+                    <option value="paused">Paused</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="searchInput">Search</label>
+                <input type="text" id="searchInput" placeholder="Search agents...">
+            </div>
+        </section>
+
+        <!-- Department Breakdown -->
+        <section class="department-section">
+            <h2 class="section-title">Department Breakdown</h2>
+            <div class="department-grid" id="departmentGrid"></div>
+        </section>
+
+        <!-- Agent Table -->
+        <section class="table-section">
+            <h2 class="section-title">All Agents</h2>
+            <div class="table-wrapper">
+                <table class="agent-table">
+                    <thead>
+                        <tr>
+                            <th>Agent Name</th>
+                            <th>Department</th>
+                            <th>Status</th>
+                            <th>Progress</th>
+                            <th>Owner</th>
+                            <th>Start Date</th>
+                            <th>Target Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="agentTableBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- Add/Edit Agent Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Agent</h2>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <form id="agentForm" class="modal-body">
+                <input type="hidden" id="agentId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="agentName">Agent Name *</label>
+                        <input type="text" id="agentName" required placeholder="e.g. Customer Support Bot">
+                    </div>
+                    <div class="form-group">
+                        <label for="agentDepartment">Department *</label>
+                        <select id="agentDepartment" required>
+                            <option value="">Select department...</option>
+                            <option value="Engineering">Engineering</option>
+                            <option value="Sales">Sales</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Customer Support">Customer Support</option>
+                            <option value="HR">HR</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Operations">Operations</option>
+                            <option value="Legal">Legal</option>
+                            <option value="Product">Product</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="agentStatus">Status *</label>
+                        <select id="agentStatus" required>
+                            <option value="planning">Planning</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="testing">Testing</option>
+                            <option value="deployed">Deployed</option>
+                            <option value="paused">Paused</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="agentProgress">Progress (%)</label>
+                        <input type="number" id="agentProgress" min="0" max="100" value="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="agentOwner">Owner</label>
+                        <input type="text" id="agentOwner" placeholder="e.g. Jane Smith">
+                    </div>
+                    <div class="form-group">
+                        <label for="agentPriority">Priority</label>
+                        <select id="agentPriority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="agentStartDate">Start Date</label>
+                        <input type="date" id="agentStartDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="agentTargetDate">Target Date</label>
+                        <input type="date" id="agentTargetDate">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="agentDescription">Description</label>
+                    <textarea id="agentDescription" rows="3" placeholder="Brief description of the agent's purpose..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveBtn">Save Agent</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModalOverlay">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h2>Confirm Delete</h2>
+                <button class="modal-close" id="deleteModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="deleteAgentName"></strong>?</p>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="deleteCancelBtn">Cancel</button>
+                    <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
