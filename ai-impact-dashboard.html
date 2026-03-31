@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Impact Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo, useCallback, useEffect } = React;
+
+    // ── Brand Tokens ──────────────────────────────────────────────
+    const T = {
+      navy: "#0B1A2E",
+      navyLight: "#122240",
+      navyMid: "#1A2D4A",
+      green: "#00E676",
+      greenDark: "#00C853",
+      greenMuted: "rgba(0,230,118,0.12)",
+      yellow: "#FFD600",
+      yellowMuted: "rgba(255,214,0,0.12)",
+      red: "#FF3D00",
+      redMuted: "rgba(255,61,0,0.10)",
+      white: "#FFFFFF",
+      gray50: "#F8FAFC",
+      gray100: "#F1F5F9",
+      gray200: "#E2E8F0",
+      gray300: "#CBD5E1",
+      gray400: "#94A3B8",
+      gray500: "#64748B",
+      gray600: "#475569",
+      gray700: "#334155",
+      card: "#FFFFFF",
+      cardBorder: "#E2E8F0",
+      font: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    };
+
+    // ── Seed Data ─────────────────────────────────────────────────
+    const SEED_PROJECTS = [
+      {
+        id: "1",
+        name: "PROPS Agent",
+        department: "Leadership",
+        status: "Complete",
+        owner: "Lewis Muller (CEO & Co-Founder)",
+        type: "n8n",
+        usage: { uses_per_week: 6, active_users: ["Jackson", "Kylie", "Lewis", "Sales Team"], last_used: "2026-03-29" },
+        impact: { hours_saved_per_week: 5, hourly_rate: 100 },
+        revenue_influence: "High",
+        replacement_value: "Replaces manual proposal writing. Avoids hiring 1 junior hire.",
+        description: "AI Assisted proposal generator for sales team. Input - Asana form. Output - branded client proposal 80-90% for sales person to put final touches and share with client.",
+        repo_url: "",
+        branch: "main",
+        workflow_link: "",
+      },
+      {
+        id: "2",
+        name: "Client Reporting Agent",
+        department: "Public Affairs",
+        status: "Planning",
+        owner: "Morgan Meszaros (Director)",
+        type: "claude script or n8n",
+        usage: { uses_per_week: 0, active_users: [], last_used: "" },
+        impact: { hours_saved_per_week: 5, hourly_rate: 100 },
+        revenue_influence: "Medium",
+        replacement_value: "Replaces manual report assembly. Reporting time drops from hours to minutes. Account managers gain capacity.",
+        description: "Client Reporting Automation. Automatically generate: campaign reports, executive summaries, performance insights and recommended actions. Pull data from: ad platforms, analytics tools, engagement metrics.",
+        repo_url: "",
+        branch: "",
+        workflow_link: "",
+      },
+      {
+        id: "3",
+        name: "Ai Adoption Tracker",
+        department: "Data & Insights",
+        status: "Complete",
+        owner: "Carlos Cordero (MD, Data & Insights)",
+        type: "Claude",
+        usage: { uses_per_week: 1, active_users: ["Jackson", "Carlos", "Lewis"], last_used: "2026-03-30" },
+        impact: { hours_saved_per_week: 1, hourly_rate: 100 },
+        revenue_influence: "Low",
+        replacement_value: "First AI Assisted App Dev - to track our projects across the organization.",
+        description: "First AI Assisted App Dev - to track our projects across the organization.",
+        repo_url: "",
+        branch: "",
+        workflow_link: "",
+      },
+      {
+        id: "4",
+        name: "Creative Brief Q/A",
+        department: "Creative & Advertising",
+        status: "Testing",
+        owner: "Tate Holcombe (Creative Director)",
+        type: "n8n",
+        usage: { uses_per_week: 0, active_users: [], last_used: "" },
+        impact: { hours_saved_per_week: 3, hourly_rate: 100 },
+        revenue_influence: "Medium",
+        replacement_value: "Streamlines creative brief intake and Q/A process.",
+        description: "Jackson leading discovery with Tate to layout agent. Tate is gathering assets to share with Jackson. Build is 50% complete.",
+        repo_url: "",
+        branch: "",
+        workflow_link: "",
+      },
+    ];
+
+    // ── Helpers ───────────────────────────────────────────────────
+    const fmt$ = (n) => {
+      if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`;
+      if (n >= 1000) return `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
+      return `$${n.toLocaleString()}`;
+    };
+
+    const calcImpact = (p) => {
+      const weekly = p.impact.hours_saved_per_week * p.impact.hourly_rate;
+      const monthly = weekly * 4;
+      const annual = weekly * 52;
+      return { weekly, monthly, annual };
+    };
+
+    const getAdoptionTag = (p) => {
+      const uses = p.usage.uses_per_week;
+      const val = calcImpact(p).annual;
+      if (uses === 0 && (p.status === "Active" || p.status === "Complete")) return { label: "Not Adopted", color: T.red, bg: T.redMuted };
+      if (uses === 0) return { label: "Not Started", color: T.gray500, bg: T.gray100 };
+      if (uses >= 5 && val >= 20000) return { label: "High Impact", color: T.green, bg: T.greenMuted };
+      if (uses >= 1 && uses < 5) return { label: "Underutilized", color: T.yellow, bg: T.yellowMuted };
+      return { label: "Active", color: T.green, bg: T.greenMuted };
+    };
+
+    const statusColors = {
+      Planning: { bg: "#EDE9FE", text: "#7C3AED" },
+      Testing: { bg: T.yellowMuted, text: "#F59E0B" },
+      Active: { bg: T.greenMuted, text: T.greenDark },
+      Complete: { bg: "#E0F2FE", text: "#0284C7" },
+    };
+
+    const DEFAULT_DEPARTMENTS = ["Leadership", "Public Affairs", "Data & Insights", "Creative & Advertising", "Strategic Communications", "Operations", "Sales", "Marketing", "Finance"];
+    const STATUSES = ["All", "Planning", "Testing", "Active", "Complete"];
+    const TYPES = ["All", "n8n", "Claude", "Hybrid", "claude script or n8n"];
+
+    // ── Shared Styles ─────────────────────────────────────────────
+    const s = {
+      kpiCard: {
+        background: T.card,
+        borderRadius: 12,
+        padding: "20px 24px",
+        border: `1px solid ${T.cardBorder}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        flex: "1 1 180px",
+        minWidth: 180,
+      },
+      kpiLabel: {
+        fontSize: 12,
+        fontWeight: 600,
+        color: T.gray500,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+        marginBottom: 6,
+      },
+      kpiValue: {
+        fontSize: 32,
+        fontWeight: 800,
+        color: T.navy,
+        lineHeight: 1.1,
+        letterSpacing: "-0.02em",
+      },
+      badge: (bg, color) => ({
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "3px 10px",
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.04em",
+        background: bg,
+        color: color,
+      }),
+      btn: (primary) => ({
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "8px 16px",
+        borderRadius: 8,
+        border: primary ? "none" : `1px solid ${T.cardBorder}`,
+        background: primary ? T.navy : T.white,
+        color: primary ? T.white : T.gray700,
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: "pointer",
+        transition: "all 0.15s",
+      }),
+      input: {
+        width: "100%",
+        padding: "8px 12px",
+        borderRadius: 8,
+        border: `1px solid ${T.gray200}`,
+        fontSize: 14,
+        fontFamily: T.font,
+        color: T.navy,
+        outline: "none",
+        background: T.gray50,
+        transition: "border 0.15s",
+      },
+    };
+
+    // ── SVG Icon Components ───────────────────────────────────────
+    function DollarSign({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>;
+    }
+    function TrendingUp({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 17"/><polyline points="17 6 23 6 23 12"/></svg>;
+    }
+    function Users({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+    }
+    function Zap({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
+    }
+    function Activity({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
+    }
+    function AlertTriangle({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.04h16.94a2 2 0 0 0 1.71-3.04l-8.47-14.14a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+    }
+    function ChevronDown({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
+    }
+    function ChevronUp({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>;
+    }
+    function Edit3({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>;
+    }
+    function Save({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
+    }
+    function X({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+    }
+    function Search({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+    }
+    function Download({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+    }
+    function ArrowUpRight({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>;
+    }
+    function Flame({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>;
+    }
+    function Skull({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20l2-2h4l2 2"/><path d="M12 2a8 8 0 0 0-8 8v2c0 1.1.9 2 2 2h1v2h10v-2h1c1.1 0 2-.9 2-2v-2a8 8 0 0 0-8-8z"/></svg>;
+    }
+    function Star({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
+    }
+    function GitBranch({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>;
+    }
+    function Link2({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
+    }
+    function Upload({ size = 24, color = "currentColor" }) {
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
+    }
+
+    // ── Components ────────────────────────────────────────────────
+
+    function KPICard({ icon: Icon, label, value, sub, accent }) {
+      return (
+        <div style={s.kpiCard}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: accent || T.greenMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon size={16} color={accent ? T.white : T.greenDark} />
+            </div>
+            <span style={s.kpiLabel}>{label}</span>
+          </div>
+          <div style={s.kpiValue}>{value}</div>
+          {sub && <div style={{ fontSize: 12, color: T.gray400, marginTop: 4 }}>{sub}</div>}
+        </div>
+      );
+    }
+
+    function ImpactBar({ value, max, color }) {
+      const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+      return (
+        <div style={{ height: 6, borderRadius: 3, background: T.gray100, overflow: "hidden", width: "100%" }}>
+          <div style={{ height: "100%", width: `${pct}%`, borderRadius: 3, background: color || T.green, transition: "width 0.4s ease" }} />
+        </div>
+      );
+    }
+
+    function ProjectCard({ project, maxAnnual, onEdit, onSave, onDelete, editingId, editData, setEditData }) {
+      const [expanded, setExpanded] = useState(false);
+      const impact = calcImpact(project);
+      const tag = getAdoptionTag(project);
+      const statusStyle = statusColors[project.status] || statusColors.Active;
+      const isEditing = editingId === project.id;
+      const daysSinceUsed = project.usage.last_used
+        ? Math.floor((new Date() - new Date(project.usage.last_used)) / 86400000)
+        : null;
+      const isStale = daysSinceUsed !== null && daysSinceUsed > 14;
+
+      return (
+        <div style={{
+          background: T.card,
+          borderRadius: 14,
+          border: `1px solid ${tag.label === "Not Adopted" ? "rgba(255,61,0,0.25)" : T.cardBorder}`,
+          boxShadow: tag.label === "Not Adopted" ? "0 0 0 1px rgba(255,61,0,0.08)" : "0 1px 3px rgba(0,0,0,0.04)",
+          overflow: "hidden",
+          transition: "all 0.2s",
+        }}>
+          {/* Header */}
+          <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+              <div style={{
+                width: 10, height: 10, borderRadius: "50%",
+                background: tag.label === "Not Adopted" ? T.red : tag.label === "High Impact" ? T.green : tag.label === "Underutilized" ? T.yellow : T.gray300,
+                flexShrink: 0,
+                boxShadow: tag.label === "High Impact" ? `0 0 8px ${T.green}` : "none",
+              }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  {isEditing ? (
+                    <input value={editData.name} onChange={e => setEditData({ ...editData, name: e.target.value })} style={{ ...s.input, fontSize: 16, fontWeight: 700, padding: "4px 8px", width: 200 }} />
+                  ) : (
+                    <span style={{ fontSize: 16, fontWeight: 700, color: T.navy, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {project.name}
+                    </span>
+                  )}
+                  {!isEditing && <span style={s.badge(statusStyle.bg, statusStyle.text)}>{project.status}</span>}
+                  <span style={s.badge(tag.bg, tag.color)}>
+                    {tag.label === "Not Adopted" && <Skull size={10} />}
+                    {tag.label === "High Impact" && <Flame size={10} />}
+                    {tag.label}
+                  </span>
+                </div>
+                {isEditing ? (
+                  <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                    <input value={editData.owner} onChange={e => setEditData({ ...editData, owner: e.target.value })} style={{ ...s.input, fontSize: 12, padding: "3px 8px", width: 180 }} placeholder="Owner" />
+                    <input value={editData.type} onChange={e => setEditData({ ...editData, type: e.target.value })} style={{ ...s.input, fontSize: 12, padding: "3px 8px", width: 120 }} placeholder="Type" />
+                    <input value={editData.department} onChange={e => setEditData({ ...editData, department: e.target.value })} style={{ ...s.input, fontSize: 12, padding: "3px 8px", width: 140 }} placeholder="Department" list="dept-list" />
+                    <select value={editData.status} onChange={e => setEditData({ ...editData, status: e.target.value })} style={{ ...s.input, fontSize: 12, padding: "3px 8px", width: 120 }}>
+                      {STATUSES.filter(st => st !== "All").map(st => <option key={st} value={st}>{st}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: T.gray400, marginTop: 2 }}>
+                    {project.owner} · {project.type} · {project.department}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ textAlign: "right", marginRight: 8 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: impact.annual > 0 && project.usage.uses_per_week > 0 ? T.greenDark : T.gray400, letterSpacing: "-0.02em" }}>
+                  {fmt$(impact.annual)}
+                </div>
+                <div style={{ fontSize: 11, color: T.gray400 }}>/year</div>
+              </div>
+              {!isEditing && (
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={() => onEdit(project)} style={{ ...s.btn(false), padding: "6px 10px" }} title="Edit">
+                    <Edit3 size={14} />
+                  </button>
+                  <button onClick={() => { if (confirm("Delete \"" + project.name + "\"? This cannot be undone.")) onDelete(project.id); }} style={{ ...s.btn(false), padding: "6px 10px", color: T.red, borderColor: "rgba(255,61,0,0.3)" }} title="Delete">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              {isEditing && (
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={() => onSave()} style={{ ...s.btn(true), padding: "6px 10px" }} title="Save">
+                    <Save size={14} />
+                  </button>
+                  <button onClick={() => onEdit(null)} style={{ ...s.btn(false), padding: "6px 10px" }} title="Cancel">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              <button onClick={() => setExpanded(!expanded)} style={{ ...s.btn(false), padding: "6px 10px" }}>
+                {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Usage strip */}
+          <div style={{
+            padding: "10px 20px",
+            background: tag.label === "Not Adopted" ? T.redMuted : T.gray50,
+            display: "flex",
+            gap: 24,
+            alignItems: "center",
+            borderTop: `1px solid ${T.gray100}`,
+            borderBottom: `1px solid ${T.gray100}`,
+            flexWrap: "wrap",
+          }}>
+            <Metric label="Uses / week" value={isEditing ? (
+              <input type="number" min={0} value={editData.uses_per_week} onChange={e => setEditData({ ...editData, uses_per_week: +e.target.value })} style={{ ...s.input, width: 64, padding: "4px 8px" }} />
+            ) : project.usage.uses_per_week} warn={project.usage.uses_per_week === 0} />
+            <Metric label="Active users" value={isEditing ? (
+              <input value={editData.active_users_str} onChange={e => setEditData({ ...editData, active_users_str: e.target.value })} style={{ ...s.input, width: 160, padding: "4px 8px" }} placeholder="Comma separated" />
+            ) : project.usage.active_users.length > 0 ? project.usage.active_users.join(", ") : "None"} warn={project.usage.active_users.length === 0} />
+            <Metric label="Last used" value={isEditing ? (
+              <input type="date" value={editData.last_used || ""} onChange={e => setEditData({ ...editData, last_used: e.target.value })} style={{ ...s.input, width: 140, padding: "4px 8px" }} />
+            ) : (project.usage.last_used || "Never")} warn={!isEditing && (isStale || !project.usage.last_used)} sub={!isEditing && isStale ? `${daysSinceUsed}d ago` : null} />
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <ImpactBar value={impact.annual} max={maxAnnual} color={tag.label === "Not Adopted" ? T.red : tag.label === "Underutilized" ? T.yellow : T.green} />
+            </div>
+          </div>
+
+          {/* Expanded detail */}
+          {expanded && (
+            <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
+              {/* Impact column */}
+              <div>
+                <SectionLabel>Time → Money</SectionLabel>
+                {isEditing ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <label style={{ fontSize: 12, color: T.gray500 }}>Hours saved / week
+                      <input type="number" min={0} value={editData.hours_saved_per_week} onChange={e => setEditData({ ...editData, hours_saved_per_week: +e.target.value })} style={{ ...s.input, marginTop: 4 }} />
+                    </label>
+                    <label style={{ fontSize: 12, color: T.gray500 }}>Blended hourly rate ($)
+                      <input type="number" min={0} value={editData.hourly_rate} onChange={e => setEditData({ ...editData, hourly_rate: +e.target.value })} style={{ ...s.input, marginTop: 4 }} />
+                    </label>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 8 }}>
+                    <MiniStat label="$/week" value={fmt$(impact.weekly)} />
+                    <MiniStat label="$/month" value={fmt$(impact.monthly)} />
+                    <MiniStat label="$/year" value={fmt$(impact.annual)} big />
+                  </div>
+                )}
+                <div style={{ marginTop: 8, fontSize: 12, color: T.gray400 }}>
+                  {project.impact.hours_saved_per_week}h/wk × ${project.impact.hourly_rate}/hr
+                </div>
+              </div>
+
+              {/* Revenue + Replacement */}
+              <div>
+                <SectionLabel>Revenue Influence</SectionLabel>
+                {isEditing ? (
+                  <select value={editData.revenue_influence} onChange={e => setEditData({ ...editData, revenue_influence: e.target.value })} style={{ ...s.input, marginTop: 4 }}>
+                    <option>High</option><option>Medium</option><option>Low</option><option>None</option>
+                  </select>
+                ) : (
+                  <span style={{
+                    ...s.badge(
+                      project.revenue_influence === "High" ? T.greenMuted : project.revenue_influence === "Medium" ? T.yellowMuted : T.gray100,
+                      project.revenue_influence === "High" ? T.greenDark : project.revenue_influence === "Medium" ? "#F59E0B" : T.gray500
+                    ),
+                    marginTop: 6, display: "inline-flex",
+                  }}>
+                    {project.revenue_influence === "High" && <ArrowUpRight size={10} />}
+                    {project.revenue_influence}
+                  </span>
+                )}
+
+                <SectionLabel style={{ marginTop: 16 }}>Replacement Value</SectionLabel>
+                {isEditing ? (
+                  <textarea value={editData.replacement_value} onChange={e => setEditData({ ...editData, replacement_value: e.target.value })} style={{ ...s.input, marginTop: 4, minHeight: 48, resize: "vertical" }} />
+                ) : (
+                  <p style={{ fontSize: 13, color: T.gray600, margin: "6px 0 0", lineHeight: 1.5 }}>{project.replacement_value}</p>
+                )}
+              </div>
+
+              {/* Description + Links */}
+              <div>
+                <SectionLabel>Description</SectionLabel>
+                {isEditing ? (
+                  <textarea value={editData.description} onChange={e => setEditData({ ...editData, description: e.target.value })} style={{ ...s.input, marginTop: 4, minHeight: 48, resize: "vertical" }} />
+                ) : (
+                  <p style={{ fontSize: 13, color: T.gray600, margin: "6px 0 0", lineHeight: 1.5 }}>{project.description}</p>
+                )}
+
+                {(project.repo_url || project.workflow_link) && (
+                  <>
+                    <SectionLabel style={{ marginTop: 16 }}>Links</SectionLabel>
+                    <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                      {project.repo_url && (
+                        <a href={project.repo_url} target="_blank" rel="noopener" style={{ ...s.btn(false), textDecoration: "none", fontSize: 12, padding: "4px 10px" }}>
+                          <GitBranch size={12} /> Repo {project.branch && `(${project.branch})`}
+                        </a>
+                      )}
+                      {project.workflow_link && (
+                        <a href={project.workflow_link} target="_blank" rel="noopener" style={{ ...s.btn(false), textDecoration: "none", fontSize: 12, padding: "4px 10px" }}>
+                          <Link2 size={12} /> Workflow
+                        </a>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function Metric({ label, value, warn, sub }) {
+      return (
+        <div>
+          <div style={{ fontSize: 11, color: T.gray400, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: warn ? T.red : T.navy, display: "flex", alignItems: "center", gap: 4 }}>
+            {warn && typeof value !== "object" && <AlertTriangle size={12} />}
+            {value}
+          </div>
+          {sub && <div style={{ fontSize: 10, color: T.red }}>{sub}</div>}
+        </div>
+      );
+    }
+
+    function MiniStat({ label, value, big }) {
+      return (
+        <div style={{ background: T.gray50, borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: T.gray400, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
+          <div style={{ fontSize: big ? 18 : 15, fontWeight: 800, color: T.navy, marginTop: 2 }}>{value}</div>
+        </div>
+      );
+    }
+
+    function SectionLabel({ children, style: extra }) {
+      return (
+        <div style={{ fontSize: 11, fontWeight: 700, color: T.gray400, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 0, ...extra }}>
+          {children}
+        </div>
+      );
+    }
+
+    function DepartmentRow({ dept, projects, maxDeptAnnual }) {
+      const activeWorkflows = projects.filter(p => p.usage.uses_per_week > 0).length;
+      const total = projects.length;
+      const adoptionRate = total > 0 ? Math.round((activeWorkflows / total) * 100) : 0;
+      const totalAnnual = projects.reduce((sum, p) => sum + calcImpact(p).annual, 0);
+      const realizedAnnual = projects.filter(p => p.usage.uses_per_week > 0).reduce((sum, p) => sum + calcImpact(p).annual, 0);
+
+      return (
+        <div style={{
+          background: T.card,
+          borderRadius: 12,
+          border: `1px solid ${T.cardBorder}`,
+          padding: "16px 20px",
+          display: "grid",
+          gridTemplateColumns: "140px 1fr 80px 80px 100px",
+          alignItems: "center",
+          gap: 16,
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: T.navy }}>{dept}</div>
+            <div style={{ fontSize: 12, color: T.gray400 }}>{total} workflow{total !== 1 ? "s" : ""}</div>
+          </div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <ImpactBar value={realizedAnnual} max={maxDeptAnnual} color={adoptionRate >= 75 ? T.green : adoptionRate >= 40 ? T.yellow : T.red} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: T.navy, whiteSpace: "nowrap" }}>{fmt$(realizedAnnual)}</span>
+            </div>
+            <div style={{ fontSize: 10, color: T.gray400 }}>{fmt$(totalAnnual)} potential</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: T.navy }}>{activeWorkflows}</div>
+            <div style={{ fontSize: 10, color: T.gray400 }}>Active</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: adoptionRate >= 75 ? T.greenDark : adoptionRate >= 40 ? "#F59E0B" : T.red }}>{adoptionRate}%</div>
+            <div style={{ fontSize: 10, color: T.gray400 }}>Adopted</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: T.navy }}>{fmt$(totalAnnual)}</div>
+            <div style={{ fontSize: 10, color: T.gray400 }}>Potential / yr</div>
+          </div>
+        </div>
+      );
+    }
+
+    function FilterSelect({ label, value, options, onChange }) {
+      return (
+        <div style={{ position: "relative", height: 38 }}>
+          <select value={value} onChange={e => onChange(e.target.value)} style={{
+            ...s.input,
+            width: "auto",
+            minWidth: 110,
+            height: 38,
+            paddingRight: 28,
+            appearance: "none",
+            cursor: "pointer",
+            fontSize: 13,
+          }}>
+            {options.map(o => <option key={o} value={o}>{o === "All" ? `${label}: All` : o}</option>)}
+          </select>
+          <ChevronDown size={12} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: T.gray400 }} />
+        </div>
+      );
+    }
+
+    function ReportSection({ title, icon, children, warn }) {
+      return (
+        <div style={{ background: T.card, borderRadius: 14, border: `1px solid ${warn ? "rgba(255,61,0,0.2)" : T.cardBorder}`, overflow: "hidden" }}>
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.gray100}`, display: "flex", alignItems: "center", gap: 8 }}>
+            {icon}
+            <span style={{ fontWeight: 700, fontSize: 14, color: T.navy }}>{title}</span>
+          </div>
+          <div>{children}</div>
+        </div>
+      );
+    }
+
+    function ReportRow({ rank, name, department, value, sub, color }) {
+      return (
+        <div style={{ display: "flex", alignItems: "center", padding: "12px 20px", borderBottom: `1px solid ${T.gray50}`, gap: 12 }}>
+          {rank && <span style={{ width: 24, height: 24, borderRadius: 6, background: T.greenMuted, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, color: T.greenDark }}>{rank}</span>}
+          <div style={{ flex: 1 }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: T.navy }}>{name}</span>
+            <span style={{ fontSize: 12, color: T.gray400, marginLeft: 8 }}>{department}</span>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontWeight: 800, fontSize: 15, color }}>{value}</div>
+            {sub && <div style={{ fontSize: 11, color: T.gray400, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>}
+          </div>
+        </div>
+      );
+    }
+
+    function AddProjectModal({ onClose, onAdd, departments }) {
+      const [form, setForm] = useState({
+        name: "", department: "Leadership", status: "Planning", owner: "", type: "n8n",
+        uses_per_week: 0, active_users_str: "", last_used: "",
+        hours_saved_per_week: 0, hourly_rate: 100,
+        revenue_influence: "Low", replacement_value: "", description: "",
+        repo_url: "", branch: "", workflow_link: "",
+      });
+      const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+
+      const handleSubmit = () => {
+        if (!form.name.trim()) return;
+        onAdd({
+          name: form.name,
+          department: form.department,
+          status: form.status,
+          owner: form.owner,
+          type: form.type,
+          usage: {
+            uses_per_week: +form.uses_per_week,
+            active_users: form.active_users_str.split(",").map(s => s.trim()).filter(Boolean),
+            last_used: form.last_used,
+          },
+          impact: { hours_saved_per_week: +form.hours_saved_per_week, hourly_rate: +form.hourly_rate },
+          revenue_influence: form.revenue_influence,
+          replacement_value: form.replacement_value,
+          description: form.description,
+          repo_url: form.repo_url,
+          branch: form.branch,
+          workflow_link: form.workflow_link,
+        });
+      };
+
+      const lbl = { fontSize: 12, fontWeight: 600, color: T.gray500, display: "block", marginBottom: 4, marginTop: 12 };
+
+      return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(11,26,46,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }} onClick={onClose}>
+          <div style={{ background: T.white, borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "85vh", overflow: "auto", padding: 32, boxShadow: "0 24px 48px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: T.navy }}>Add AI Project</h2>
+              <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: T.gray400 }}><X size={20} /></button>
+            </div>
+
+            <label style={lbl}>Project Name *</label>
+            <input value={form.name} onChange={e => set("name", e.target.value)} style={s.input} placeholder="e.g., Onboarding Bot" />
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div><label style={lbl}>Department</label>
+                <select value={form.department} onChange={e => set("department", e.target.value)} style={s.input}>
+                  {departments.filter(d => d !== "All").map(d => <option key={d}>{d}</option>)}
+                </select></div>
+              <div><label style={lbl}>Status</label>
+                <select value={form.status} onChange={e => set("status", e.target.value)} style={s.input}>
+                  {STATUSES.filter(d => d !== "All").map(d => <option key={d}>{d}</option>)}
+                </select></div>
+              <div><label style={lbl}>Type</label>
+                <select value={form.type} onChange={e => set("type", e.target.value)} style={s.input}>
+                  {TYPES.filter(d => d !== "All").map(d => <option key={d}>{d}</option>)}
+                </select></div>
+            </div>
+
+            <label style={lbl}>Owner</label>
+            <input value={form.owner} onChange={e => set("owner", e.target.value)} style={s.input} placeholder="e.g., Jackson" />
+
+            <label style={lbl}>Description</label>
+            <textarea value={form.description} onChange={e => set("description", e.target.value)} style={{ ...s.input, minHeight: 56, resize: "vertical" }} placeholder="Inputs → Outputs → Impact" />
+
+            <div style={{ borderTop: `1px solid ${T.gray200}`, marginTop: 20, paddingTop: 12 }}>
+              <SectionLabel>Usage</SectionLabel>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div><label style={lbl}>Uses / week</label><input type="number" min={0} value={form.uses_per_week} onChange={e => set("uses_per_week", e.target.value)} style={s.input} /></div>
+                <div><label style={lbl}>Active users</label><input value={form.active_users_str} onChange={e => set("active_users_str", e.target.value)} style={s.input} placeholder="Comma separated" /></div>
+                <div><label style={lbl}>Last used</label><input type="date" value={form.last_used} onChange={e => set("last_used", e.target.value)} style={s.input} /></div>
+              </div>
+            </div>
+
+            <div style={{ borderTop: `1px solid ${T.gray200}`, marginTop: 20, paddingTop: 12 }}>
+              <SectionLabel>Impact</SectionLabel>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div><label style={lbl}>Hours saved / wk</label><input type="number" min={0} value={form.hours_saved_per_week} onChange={e => set("hours_saved_per_week", e.target.value)} style={s.input} /></div>
+                <div><label style={lbl}>Hourly rate ($)</label><input type="number" min={0} value={form.hourly_rate} onChange={e => set("hourly_rate", e.target.value)} style={s.input} /></div>
+                <div><label style={lbl}>Revenue influence</label>
+                  <select value={form.revenue_influence} onChange={e => set("revenue_influence", e.target.value)} style={s.input}>
+                    <option>High</option><option>Medium</option><option>Low</option><option>None</option>
+                  </select></div>
+              </div>
+              <label style={lbl}>Replacement value</label>
+              <input value={form.replacement_value} onChange={e => set("replacement_value", e.target.value)} style={s.input} placeholder="e.g., Replaces manual process, avoids 1 hire" />
+            </div>
+
+            <div style={{ borderTop: `1px solid ${T.gray200}`, marginTop: 20, paddingTop: 12 }}>
+              <SectionLabel>Links (optional)</SectionLabel>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div><label style={lbl}>Repo URL</label><input value={form.repo_url} onChange={e => set("repo_url", e.target.value)} style={s.input} /></div>
+                <div><label style={lbl}>Branch</label><input value={form.branch} onChange={e => set("branch", e.target.value)} style={s.input} /></div>
+                <div><label style={lbl}>Workflow link</label><input value={form.workflow_link} onChange={e => set("workflow_link", e.target.value)} style={s.input} /></div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 24 }}>
+              <button onClick={onClose} style={s.btn(false)}>Cancel</button>
+              <button onClick={handleSubmit} style={{ ...s.btn(true), background: T.greenDark, color: T.navy, fontWeight: 800 }}>Add Project</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Google Sheets API Config ─────────────────────────────────
+    // PASTE YOUR DEPLOYED WEB APP URL HERE:
+    const SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyPlOqR5umD5wqZDsZb2rf8BH-XMxNr8MECGhzdIpGiDlXWfFWc9VmRyjHTPf0mYMf7/exec";
+
+    // Helper: POST to Google Apps Script (handles CORS redirect properly)
+    async function gasPost(payload) {
+      try {
+        const res = await fetch(SHEETS_API_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload),
+        });
+        // no-cors returns opaque response, so we can't read it — but the data IS sent
+        return { success: true };
+      } catch (err) {
+        console.error("GAS POST failed:", err);
+        throw err;
+      }
+    }
+
+    const SheetsDB = {
+      async load() {
+        if (SHEETS_API_URL.includes("PASTE_YOUR")) return null;
+        const res = await fetch(SHEETS_API_URL);
+        if (!res.ok) throw new Error("Failed to load from Sheets");
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        return data.map(row => ({
+          id: String(row.id || Date.now()),
+          name: row.name || "",
+          department: row.department || "",
+          status: row.status || "Planning",
+          owner: row.owner || "",
+          type: row.type || "",
+          usage: {
+            uses_per_week: Number(row.uses_per_week) || 0,
+            active_users: Array.isArray(row.active_users) ? row.active_users : (row.active_users ? String(row.active_users).split(",").map(s => s.trim()).filter(Boolean) : []),
+            last_used: row.last_used || "",
+          },
+          impact: {
+            hours_saved_per_week: Number(row.hours_saved_per_week) || 0,
+            hourly_rate: Number(row.hourly_rate) || 100,
+          },
+          revenue_influence: row.revenue_influence || "Low",
+          replacement_value: row.replacement_value || "",
+          description: row.description || "",
+          repo_url: row.repo_url || "",
+          branch: row.branch || "",
+          workflow_link: row.workflow_link || "",
+        }));
+      },
+      _flatten(p) {
+        return {
+          id: p.id,
+          name: p.name,
+          department: p.department,
+          status: p.status,
+          owner: p.owner,
+          type: p.type,
+          uses_per_week: p.usage.uses_per_week,
+          active_users: p.usage.active_users.join(", "),
+          last_used: p.usage.last_used,
+          hours_saved_per_week: p.impact.hours_saved_per_week,
+          hourly_rate: p.impact.hourly_rate,
+          revenue_influence: p.revenue_influence,
+          replacement_value: p.replacement_value,
+          description: p.description,
+          repo_url: p.repo_url || "",
+        };
+      },
+      async syncAll(projects) {
+        if (SHEETS_API_URL.includes("PASTE_YOUR")) return;
+        return gasPost({ action: "save_all", projects: projects.map(p => SheetsDB._flatten(p)) });
+      },
+    };
+
+    // ── Main Dashboard ────────────────────────────────────────────
+    function AIDashboard() {
+      const [projects, setProjects] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [view, setView] = useState("projects");
+      const [filterDept, setFilterDept] = useState("All");
+      const [filterStatus, setFilterStatus] = useState("All");
+      const [filterType, setFilterType] = useState("All");
+      const [search, setSearch] = useState("");
+      const [editingId, setEditingId] = useState(null);
+      const [editData, setEditData] = useState({});
+      const [showAddModal, setShowAddModal] = useState(false);
+      const [saveStatus, setSaveStatus] = useState("");
+
+      // Load from Google Sheets on mount
+      useEffect(() => {
+        (async () => {
+          try {
+            const data = await SheetsDB.load();
+            if (data) {
+              setProjects(data); // Use whatever the sheet has, even if empty
+            }
+          } catch (err) {
+            console.error("Failed to load from Sheets, using local data:", err);
+          }
+          setLoading(false);
+        })();
+      }, []);
+
+      const filtered = useMemo(() => {
+        return projects.filter(p => {
+          if (filterDept !== "All" && p.department !== filterDept) return false;
+          if (filterStatus !== "All" && p.status !== filterStatus) return false;
+          if (filterType !== "All" && p.type !== filterType) return false;
+          if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.owner.toLowerCase().includes(search.toLowerCase())) return false;
+          return true;
+        });
+      }, [projects, filterDept, filterStatus, filterType, search]);
+
+      const kpis = useMemo(() => {
+        const active = projects.filter(p => p.usage.uses_per_week > 0);
+        const monthlyTotal = active.reduce((s, p) => s + calcImpact(p).monthly, 0);
+        const annualTotal = active.reduce((s, p) => s + calcImpact(p).annual, 0);
+        const activeWorkflows = active.length;
+        const allUsers = [...new Set(projects.flatMap(p => p.usage.active_users))];
+        const weeklyUses = projects.reduce((s, p) => s + p.usage.uses_per_week, 0);
+        return { monthlyTotal, annualTotal, activeWorkflows, activeUsers: allUsers.length, weeklyUses };
+      }, [projects]);
+
+      const maxAnnual = useMemo(() => Math.max(...projects.map(p => calcImpact(p).annual), 1), [projects]);
+
+      // Dynamic departments: merge defaults + any departments from actual data
+      const DEPARTMENTS = useMemo(() => {
+        const fromData = projects.map(p => p.department).filter(Boolean);
+        const all = [...new Set([...DEFAULT_DEPARTMENTS, ...fromData])].sort();
+        return ["All", ...all];
+      }, [projects]);
+
+      const handleEdit = useCallback((project) => {
+        if (!project) { setEditingId(null); return; }
+        setEditingId(project.id);
+        setEditData({
+          name: project.name,
+          owner: project.owner,
+          type: project.type,
+          department: project.department,
+          status: project.status,
+          last_used: project.usage.last_used || "",
+          uses_per_week: project.usage.uses_per_week,
+          active_users_str: project.usage.active_users.join(", "),
+          hours_saved_per_week: project.impact.hours_saved_per_week,
+          hourly_rate: project.impact.hourly_rate,
+          revenue_influence: project.revenue_influence,
+          replacement_value: project.replacement_value,
+          description: project.description,
+        });
+      }, []);
+
+      // Sync entire project list to sheet (replaces all rows)
+      const syncToSheet = useCallback((updatedProjects) => {
+        setSaveStatus("Syncing...");
+        SheetsDB.syncAll(updatedProjects).then(() => {
+          // Verify by re-loading after a short delay
+          setTimeout(async () => {
+            try {
+              const freshData = await SheetsDB.load();
+              if (freshData && freshData.length === updatedProjects.length) {
+                setSaveStatus("Synced");
+              } else {
+                setSaveStatus("Sync may have failed — refresh to check");
+              }
+            } catch { setSaveStatus("Synced"); }
+            setTimeout(() => setSaveStatus(""), 3000);
+          }, 2000);
+        }).catch(() => {
+          setSaveStatus("Sync failed");
+          setTimeout(() => setSaveStatus(""), 3000);
+        });
+      }, []);
+
+      const handleSave = useCallback(() => {
+        const current = projects.find(p => p.id === editingId);
+        if (!current) return;
+        const updatedProject = {
+          ...current,
+          name: editData.name,
+          owner: editData.owner,
+          type: editData.type,
+          department: editData.department,
+          status: editData.status,
+          usage: { ...current.usage, uses_per_week: editData.uses_per_week, active_users: editData.active_users_str.split(",").map(s => s.trim()).filter(Boolean), last_used: editData.last_used },
+          impact: { ...current.impact, hours_saved_per_week: editData.hours_saved_per_week, hourly_rate: editData.hourly_rate },
+          revenue_influence: editData.revenue_influence,
+          replacement_value: editData.replacement_value,
+          description: editData.description,
+        };
+        const newList = projects.map(p => p.id === editingId ? updatedProject : p);
+        setProjects(newList);
+        setEditingId(null);
+        syncToSheet(newList);
+      }, [projects, editingId, editData, syncToSheet]);
+
+      const handleAddProject = useCallback((newProject) => {
+        const project = { ...newProject, id: String(Date.now()) };
+        const newList = [...projects, project];
+        setProjects(newList);
+        setShowAddModal(false);
+        syncToSheet(newList);
+      }, [projects, syncToSheet]);
+
+      const handleDelete = useCallback((id) => {
+        const newList = projects.filter(p => p.id !== id);
+        setProjects(newList);
+        syncToSheet(newList);
+      }, [projects, syncToSheet]);
+
+      const deptGroups = useMemo(() => {
+        const groups = {};
+        projects.forEach(p => {
+          if (!groups[p.department]) groups[p.department] = [];
+          groups[p.department].push(p);
+        });
+        return groups;
+      }, [projects]);
+
+      const maxDeptAnnual = useMemo(() => {
+        return Math.max(...Object.values(deptGroups).map(ps => ps.filter(p => p.usage.uses_per_week > 0).reduce((s, p) => s + calcImpact(p).annual, 0)), 1);
+      }, [deptGroups]);
+
+      const reportData = useMemo(() => {
+        const sorted = [...projects].sort((a, b) => calcImpact(b).annual - calcImpact(a).annual);
+        const top5 = sorted.filter(p => p.usage.uses_per_week > 0).slice(0, 5);
+        const underutilized = projects.filter(p => p.usage.uses_per_week === 0 && (p.status === "Active" || p.status === "Complete"));
+        const revenueTools = projects.filter(p => p.revenue_influence === "High" && p.usage.uses_per_week > 0);
+        return { top5, underutilized, revenueTools };
+      }, [projects]);
+
+      const exportCSV = useCallback(() => {
+        const headers = ["Name", "Department", "Status", "Owner", "Type", "Uses/Week", "Active Users", "Last Used", "Hours Saved/Week", "Hourly Rate", "$/Week", "$/Month", "$/Year", "Revenue Influence", "Replacement Value", "Adoption Tag"];
+        const rows = projects.map(p => {
+          const imp = calcImpact(p);
+          const tag = getAdoptionTag(p);
+          return [p.name, p.department, p.status, p.owner, p.type, p.usage.uses_per_week, p.usage.active_users.join("; "), p.usage.last_used, p.impact.hours_saved_per_week, p.impact.hourly_rate, imp.weekly, imp.monthly, imp.annual, p.revenue_influence, `"${p.replacement_value}"`, tag.label];
+        });
+        const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "ai-impact-report.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+      }, [projects]);
+
+      const exportJSON = useCallback(() => {
+        const blob = new Blob([JSON.stringify(projects, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "ai-impact-projects.json";
+        a.click();
+        URL.revokeObjectURL(url);
+      }, [projects]);
+
+      const importJSON = useCallback(() => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/json";
+        input.onchange = (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const imported = JSON.parse(event.target.result);
+                if (Array.isArray(imported)) {
+                  setProjects(imported);
+                  syncToSheet(imported);
+                  alert("Projects imported successfully!");
+                }
+              } catch (err) {
+                alert("Error importing JSON: " + err.message);
+              }
+            };
+            reader.readAsText(file);
+          }
+        };
+        input.click();
+      }, []);
+
+      if (loading) {
+        return (
+          <div style={{ fontFamily: T.font, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: T.gray50 }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ width: 40, height: 40, borderRadius: 8, background: `linear-gradient(135deg, ${T.green}, ${T.greenDark})`, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: T.navy }}>TB</div>
+              <div style={{ fontSize: 14, color: T.gray500 }}>Loading dashboard from Google Sheets...</div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div style={{ fontFamily: T.font, background: T.gray50, minHeight: "100vh", color: T.navy }}>
+          {/* Nav */}
+          <header style={{
+            background: T.navy,
+            padding: "0 32px",
+            height: 56,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            position: "sticky",
+            top: 0,
+            zIndex: 100,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 6,
+                  background: `linear-gradient(135deg, ${T.green}, ${T.greenDark})`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 900, fontSize: 14, color: T.navy,
+                }}>TB</div>
+                <span style={{ color: T.white, fontWeight: 800, fontSize: 16, letterSpacing: "-0.02em" }}>Think Big</span>
+                <span style={{ color: T.gray400, fontSize: 13, fontWeight: 500, marginLeft: 4 }}>AI Impact Dashboard</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {["projects", "departments", "report"].map(v => (
+                <button key={v} onClick={() => setView(v)} style={{
+                  padding: "6px 14px", borderRadius: 6, border: "none", cursor: "pointer",
+                  background: view === v ? "rgba(255,255,255,0.12)" : "transparent",
+                  color: view === v ? T.white : T.gray400,
+                  fontSize: 13, fontWeight: 600, textTransform: "capitalize", transition: "all 0.15s",
+                }}>{v}</button>
+              ))}
+              <button onClick={exportCSV} style={{ ...s.btn(false), marginLeft: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: T.gray300, padding: "6px 12px" }}>
+                <Download size={14} /> CSV
+              </button>
+              <button onClick={exportJSON} style={{ ...s.btn(false), background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: T.gray300, padding: "6px 12px" }}>
+                <Download size={14} /> JSON
+              </button>
+              <button onClick={importJSON} style={{ ...s.btn(false), background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: T.gray300, padding: "6px 12px" }}>
+                <Upload size={14} /> Import
+              </button>
+              {saveStatus && <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 999, marginLeft: 8, background: saveStatus === "Syncing..." ? "rgba(255,255,255,0.1)" : saveStatus === "Synced" ? T.greenMuted : T.redMuted, color: saveStatus === "Syncing..." ? T.gray300 : saveStatus === "Synced" ? T.green : T.red }}>{saveStatus === "Synced" ? "✓ Synced to Sheets" : saveStatus}</span>}
+            </div>
+          </header>
+
+          <main style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 32px 64px" }}>
+            {/* KPIs */}
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
+              <KPICard icon={DollarSign} label="$ Saved / Month" value={fmt$(kpis.monthlyTotal)} sub="From active workflows only" accent={T.greenDark} />
+              <KPICard icon={TrendingUp} label="$ Saved / Year" value={fmt$(kpis.annualTotal)} sub="Projected annual impact" accent={T.greenDark} />
+              <KPICard icon={Zap} label="Active Workflows" value={kpis.activeWorkflows} sub={`of ${projects.length} total`} />
+              <KPICard icon={Users} label="Active Users" value={kpis.activeUsers} />
+              <KPICard icon={Activity} label="Total Uses / Week" value={kpis.weeklyUses} />
+            </div>
+
+            {/* ── Projects View ─── */}
+            {view === "projects" && (
+              <>
+                {/* Toolbar */}
+                <datalist id="dept-list">
+                  {DEPARTMENTS.filter(d => d !== "All").map(d => <option key={d} value={d} />)}
+                </datalist>
+                <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+                  <div style={{ position: "relative", flex: "1 1 200px", maxWidth: 300, height: 38 }}>
+                    <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: T.gray400, pointerEvents: "none", zIndex: 1 }} />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects or owners..." style={{ ...s.input, paddingLeft: 34, height: 38 }} />
+                  </div>
+                  <FilterSelect label="Department" value={filterDept} options={DEPARTMENTS} onChange={setFilterDept} />
+                  <FilterSelect label="Status" value={filterStatus} options={STATUSES} onChange={setFilterStatus} />
+                  <FilterSelect label="Type" value={filterType} options={TYPES} onChange={setFilterType} />
+                  <button onClick={() => setShowAddModal(true)} style={{ ...s.btn(true), height: 38 }}>+ Add Project</button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {filtered.length === 0 && (
+                    <div style={{ textAlign: "center", padding: 48, color: T.gray400, fontSize: 14 }}>No projects match your filters.</div>
+                  )}
+                  {filtered.sort((a, b) => calcImpact(b).annual - calcImpact(a).annual).map(p => (
+                    <ProjectCard key={p.id} project={p} maxAnnual={maxAnnual} onEdit={handleEdit} onSave={handleSave} onDelete={handleDelete} editingId={editingId} editData={editData} setEditData={setEditData} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* ── Departments View ─── */}
+            {view === "departments" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 80px 80px 100px", gap: 16, padding: "0 20px", marginBottom: 4 }}>
+                  {["Department", "Realized Value", "Active", "Adopted", "Potential"].map(h => (
+                    <span key={h} style={{ fontSize: 11, fontWeight: 700, color: T.gray400, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: h === "Active" || h === "Adopted" ? "center" : h === "Potential" ? "right" : "left" }}>{h}</span>
+                  ))}
+                </div>
+                {Object.entries(deptGroups).sort((a, b) => {
+                  const aVal = a[1].filter(p => p.usage.uses_per_week > 0).reduce((s, p) => s + calcImpact(p).annual, 0);
+                  const bVal = b[1].filter(p => p.usage.uses_per_week > 0).reduce((s, p) => s + calcImpact(p).annual, 0);
+                  return bVal - aVal;
+                }).map(([dept, ps]) => (
+                  <DepartmentRow key={dept} dept={dept} projects={ps} maxDeptAnnual={maxDeptAnnual} />
+                ))}
+              </div>
+            )}
+
+            {/* ── Report View ─── */}
+            {view === "report" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                {/* Summary */}
+                <div style={{ background: T.navy, borderRadius: 14, padding: "28px 32px", color: T.white }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.gray400, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                    Impact Summary — {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+                  </div>
+                  <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{ fontSize: 40, fontWeight: 900, color: T.green, letterSpacing: "-0.03em" }}>{fmt$(kpis.annualTotal)}</div>
+                      <div style={{ fontSize: 13, color: T.gray400 }}>Total Annual Savings (realized)</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: "-0.03em" }}>{fmt$(kpis.monthlyTotal)}</div>
+                      <div style={{ fontSize: 13, color: T.gray400 }}>Monthly Savings</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: "-0.03em" }}>{kpis.activeWorkflows}/{projects.length}</div>
+                      <div style={{ fontSize: 13, color: T.gray400 }}>Workflows Active</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top 5 */}
+                <ReportSection title="Top 5 Highest Impact Agents" icon={<Star size={14} color={T.green} />}>
+                  {reportData.top5.map((p, i) => (
+                    <ReportRow key={p.id} rank={i + 1} name={p.name} department={p.department} value={fmt$(calcImpact(p).annual)} sub={`${p.usage.uses_per_week} uses/wk · ${p.usage.active_users.length} users`} color={T.greenDark} />
+                  ))}
+                </ReportSection>
+
+                {/* Underutilized */}
+                <ReportSection title="Underutilized Agents" icon={<AlertTriangle size={14} color={T.red} />} warn>
+                  {reportData.underutilized.length === 0 ? (
+                    <div style={{ padding: 16, fontSize: 13, color: T.gray400 }}>All built agents are being used.</div>
+                  ) : reportData.underutilized.map(p => (
+                    <ReportRow key={p.id} name={p.name} department={p.department} value="0 uses" sub={`Potential: ${fmt$(calcImpact(p).annual)}/yr wasted`} color={T.red} />
+                  ))}
+                </ReportSection>
+
+                {/* Revenue influencing */}
+                <ReportSection title="Revenue-Influencing Tools" icon={<ArrowUpRight size={14} color={T.green} />}>
+                  {reportData.revenueTools.length === 0 ? (
+                    <div style={{ padding: 16, fontSize: 13, color: T.gray400 }}>No active high-revenue-influence tools.</div>
+                  ) : reportData.revenueTools.map(p => (
+                    <ReportRow key={p.id} name={p.name} department={p.department} value={fmt$(calcImpact(p).annual)} sub={p.replacement_value} color={T.greenDark} />
+                  ))}
+                </ReportSection>
+              </div>
+            )}
+          </main>
+
+          {/* Add Project Modal */}
+          {showAddModal && <AddProjectModal onClose={() => setShowAddModal(false)} onAdd={handleAddProject} departments={DEPARTMENTS} />}
+        </div>
+      );
+    }
+
+    // ── Render ────────────────────────────────────────────────────
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<AIDashboard />);
+  </script>
+</body>
+</html>
